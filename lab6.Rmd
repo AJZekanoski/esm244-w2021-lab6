@@ -16,10 +16,69 @@ library(janitor)
 library(sf)
 library(gstat)
 library(stars)
+library(tmap)
 ```
 
 ```{r}
 ca_dgw <- read_sf(here("ca_dgw"), layer = "F2013_DBGS_Points_20150720_093252") %>% 
   clean_names()
+
+st_crs(ca_dgw)
+
+ca_counties <- read_sf(here("ca_counties"), layer = "CA_Counties_TIGER2016") %>% 
+  clean_names() %>% 
+  select(name)
+
+st_crs(ca_counties)
+
+ca_counties <- st_transform(ca_counties, st_crs(ca_dgw))
 ```
+
+```{r}
+ggplot() +
+  geom_sf(data = ca_counties) +
+  geom_sf(data = ca_dgw, aes(color = dgbs))
+```
+
+```{r}
+tmap_mode("view")
+
+tm_shape(ca_dgw) +
+  tm_dots("dgbs")
+```
+
+```{r}
+sj_county <- ca_counties %>% 
+  filter(name == "San Joaquin")
+
+sj_depth <- ca_dgw %>% 
+  st_intersection(sj_county)
+
+plot(sj_depth)
+
+ggplot() +
+  geom_sf(data = sj_county) +
+  geom_sf(data = sj_depth, aes(color = dgbs))
+```
+
+
+```{r}
+well_duplicates <- sj_depth %>% 
+  get_dupes(latitude, longitude)
+
+sj_depth <- sj_depth %>% 
+  filter(!local_well %in% well_duplicates$local_well)
+
+sj_depth %>% 
+  get_dupes(latitude, longitude)
+```
+
+
+### Create a variogram
+```{r}
+sj_dgw_vgm <- variogram(dgbs ~ 1, data = sj_depth)
+
+plot(sj_dgw_vgm)
+```
+
 
